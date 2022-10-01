@@ -15,6 +15,7 @@
 #include <GraphMol/ForceFieldHelpers/MMFF/Builder.h>
 #include <GraphMol/DistGeomHelpers/Embedder.h>
 #include <GraphMol/MolTransforms/MolTransforms.h>
+#include <GraphMol/FileParsers/MolSupplier.h>
 
 extern "C"
 {
@@ -101,7 +102,8 @@ int OptFromSmiles(char *smiles, int *atomicNumbers, int *atomCharges, double *po
         }
         RDKit::MolOps::Kekulize(*mol);
         numBonds[0] = (int)mol->getNumBonds();
-        for (int i = 0; i < numBonds[0]; i++) {
+        for (int i = 0; i < numBonds[0]; i++)
+        {
             bondConnections[2 * i + 0] = (int)mol->getBondWithIdx(i)->getBeginAtomIdx();
             bondConnections[2 * i + 1] = (int)mol->getBondWithIdx(i)->getEndAtomIdx();
             bondOrders[i] = (double)mol->getBondWithIdx(i)->getBondTypeAsDouble();
@@ -123,44 +125,45 @@ int OptFromSmiles(char *smiles, int *atomicNumbers, int *atomCharges, double *po
     return 0;
 }
 
-
-int OptMolecule(int numAtoms, int* atomicNumbers, int* atomCharges, int numBonds, int* bondConnections, double* bondOrders,  double* positions)
+int OptMolecule(int numAtoms, int *atomicNumbers, int *atomCharges, int numBonds, int *bondConnections, double *bondOrders, double *positions)
 {
     int max_minimize = 5;
     try
     {
         auto mol = new RDKit::RWMol();
-        for (int i = 0; i < numAtoms; i++) {
+        for (int i = 0; i < numAtoms; i++)
+        {
             auto atom = new RDKit::Atom(atomicNumbers[i]);
             atom->setFormalCharge(atomCharges[i]);
             mol->addAtom(atom);
         }
-        for (int i = 0; i < numBonds; i++) {
+        for (int i = 0; i < numBonds; i++)
+        {
             auto bond = new RDKit::Bond();
             bond->setBeginAtomIdx(bondConnections[2 * i + 0]);
             bond->setEndAtomIdx(bondConnections[2 * i + 1]);
             switch ((int)bondOrders[i])
             {
-                case 1:
-                    bond->setBondType(RDKit::Bond::SINGLE);
-                    break;
-                case 2:
-                    bond->setBondType(RDKit::Bond::DOUBLE);
-                    break;
-                case 3:
-                    bond->setBondType(RDKit::Bond::TRIPLE);
-                    break;
-                default:
-                    bond->setBondType(RDKit::Bond::SINGLE);
-                    break;
+            case 1:
+                bond->setBondType(RDKit::Bond::SINGLE);
+                break;
+            case 2:
+                bond->setBondType(RDKit::Bond::DOUBLE);
+                break;
+            case 3:
+                bond->setBondType(RDKit::Bond::TRIPLE);
+                break;
+            default:
+                bond->setBondType(RDKit::Bond::SINGLE);
+                break;
             }
             mol->addBond(bond);
         }
         RDKit::MolOps::KekulizeIfPossible(*mol); // for initialize ring information
         auto embededs = RDKit::DGeomHelpers::EmbedMolecule(*mol);
         RDKit::MMFF::sanitizeMMFFMol(*mol);
-        auto* prop = new RDKit::MMFF::MMFFMolProperties(*mol);
-        auto* field = RDKit::MMFF::constructForceField(*mol, prop);
+        auto *prop = new RDKit::MMFF::MMFFMolProperties(*mol);
+        auto *field = RDKit::MMFF::constructForceField(*mol, prop);
         field->initialize();
         field->minimize(max_minimize);
         auto conf = mol->getConformer();
@@ -175,7 +178,8 @@ int OptMolecule(int numAtoms, int* atomicNumbers, int* atomCharges, int numBonds
             positions[3 * i + 2] = pos.z;
         }
         RDKit::MolOps::Kekulize(*mol);
-        for (int i = 0; i < numBonds; i++) {
+        for (int i = 0; i < numBonds; i++)
+        {
             bondConnections[2 * i + 0] = (int)mol->getBondWithIdx(i)->getBeginAtomIdx();
             bondConnections[2 * i + 1] = (int)mol->getBondWithIdx(i)->getEndAtomIdx();
             bondOrders[i] = (double)mol->getBondWithIdx(i)->getBondTypeAsDouble();
@@ -183,6 +187,69 @@ int OptMolecule(int numAtoms, int* atomicNumbers, int* atomCharges, int numBonds
         delete field;
         delete prop;
         delete mol;
+    }
+    catch (std::runtime_error e)
+    {
+        std::cerr << "RDKitWrapper runtime_error: " << e.what() << std::endl;
+        return -1;
+    }
+    catch (...)
+    {
+        std::cerr << "RDKitWrapper unknown exception" << std::endl;
+        return -1;
+    }
+    return 0;
+}
+
+int ReadSdf(char *path, int *numMolecules, int *numAtoms, int *atomicNumbers, int *atomCharges, int *numBonds, int *bondConnections, double *bondOrders, double *positions)
+{
+    int max_minimize = 5;
+    try
+    {
+        auto supplier = new RDKit::SDMolSupplier(path, true, false, true);
+        RDKit::RWMol *mol;
+        RDGeom::Point3D pos;
+        RDKit::Conformer conf;
+        int offsetAtom = 0;
+        int offsetBond = 0;
+        numMolecules[0] = 1;
+        RDKit::ROMol *mol_;
+        while (true)
+        {
+            try
+            {
+                mol_ = supplier->next();
+            }
+            catch (...)
+            {
+                delete mol_;
+                break;
+            }
+            mol = new RDKit::RWMol(*mol_);
+            RDKit::MolOps::Kekulize(*mol);
+            numAtoms[numMolecules[0] - 1] = (int)mol->getNumAtoms();
+            numBonds[numMolecules[0] - 1] = (int)mol->getNumBonds();
+            conf = mol->getConformer();
+            for (int i = 0; i < numAtoms[numMolecules[0] - 1]; i++)
+            {
+                atomicNumbers[offsetAtom + i] = mol->getAtomWithIdx(i)->getAtomicNum();
+                atomCharges[offsetAtom + i] = mol->getAtomWithIdx(i)->getFormalCharge();
+                pos = conf.getAtomPos(i);
+                positions[3 * (offsetAtom + i) + 0] = pos.x;
+                positions[3 * (offsetAtom + i) + 1] = pos.y;
+                positions[3 * (offsetAtom + i) + 2] = pos.z;
+            }
+            for (int i = 0; i < numBonds[numMolecules[0] - 1]; i++)
+            {
+                bondConnections[2 * (offsetBond + i) + 0] = (int)mol->getBondWithIdx(i)->getBeginAtomIdx();
+                bondConnections[2 * (offsetBond + i) + 1] = (int)mol->getBondWithIdx(i)->getEndAtomIdx();
+                bondOrders[offsetBond + i] = (double)mol->getBondWithIdx(i)->getBondTypeAsDouble();
+            }
+            offsetAtom += numAtoms[numMolecules[0] - 1];
+            offsetBond += numBonds[numMolecules[0] - 1];
+            numMolecules[0]++;
+            delete mol;
+        }
     }
     catch (std::runtime_error e)
     {
