@@ -1,0 +1,4 @@
+LIBRARY RDKitWrapper
+EXPORTS
+    DrawSVG
+    OptFromSmiles
