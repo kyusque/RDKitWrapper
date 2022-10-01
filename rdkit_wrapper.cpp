@@ -20,7 +20,9 @@
 extern "C"
 {
     int DrawSVG(char *smiles, char *buf, size_t bufsize);
-    int OptFromSmiles(char *smiles, int *atomicNumbers, int *atomCharges, double *positions, int numAtoms);
+    int OptFromSmiles(char *smiles, int *atomicNumbers, int *atomCharges, double *positions, int *bondConnections, double *bondOrders, int *numAtoms, int *numBonds);
+    int OptMolecule(int numAtoms, int *atomicNumbers, int *atomCharges, int numBonds, int *bondConnections, double *bondOrders, double *positions);
+    int ReadSdf(char *path, int *numMolecules, int *numAtoms, int *atomicNumbers, int *atomCharges, int *numBonds, int *bondConnections, double *bondOrders, double *positions);
 }
 
 int DrawSVG(char *smiles, char *buf, size_t bufsize)
