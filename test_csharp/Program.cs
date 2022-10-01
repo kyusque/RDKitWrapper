@@ -38,6 +38,27 @@ if (numBonds[0] > 0)
 }
 Console.WriteLine("[Test End] OptFromSmiles");
 
+Console.WriteLine("[Test Start] OptMolecule");
+positons = new double[3 * exactNumAtoms[0]];
+OptMolecule(exactNumAtoms[0], atomicNums, atomCharges, numBonds[0], bondConnections, bondOrders, positons);
+Console.WriteLine(exactNumAtoms[0]);
+if (exactNumAtoms[0] > 0)
+{
+    for(var i = 0; i < exactNumAtoms[0]; i++)
+    {
+        Console.WriteLine("" + atomicNums[i] + ": " + atomCharges[i] + ": " + positons[3 * i + 0] + ", " + positons[3 * i + 1] + ", " + positons[3 * i + 2]);
+    }
+}
+if (numBonds[0] > 0)
+{   
+    Console.WriteLine(numBonds[0]);
+    for(var i = 0; i < numBonds[0]; i++)
+    {
+        Console.WriteLine("" + bondOrders[i] + ": " + bondConnections[2 * i + 0] + ", " + bondConnections[2 * i + 1]);
+    }
+}
+Console.WriteLine("[Test End] OptMolecule");
+
 [DllImport("RDKitWrapper")]
 extern static int DrawSVG(string smiles, [Out] StringBuilder buf, Int32 bufsize);
 
@@ -51,4 +72,15 @@ extern static int OptFromSmiles(
     [Out] double[] bondOrders, 
     [Out] int[] numAtoms, 
     [Out] int[] numBonds
+    );
+
+[DllImport("RDKitWrapper")]
+extern static int OptMolecule(
+    [In] int numAtoms,
+    [In] int[] atomicNums, 
+    [In] int[] atomCharges,  
+    [In] int numBonds,
+    [In] int[] bondConnections, 
+    [In] double[] bondOrders,
+    [Out] double[] positions
     );
